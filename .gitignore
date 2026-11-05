@@ -1,0 +1,18 @@
+# Generated reports and diagnostics
+*.xlsx
+*.csv
+*.export.log
+*.export-error.log
+last-*.log
+last-*.tsv
+last-*.txt
+export-request.txt
+
+# Installer backups
+*.backup-*
+
+# Editor and OS files
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db

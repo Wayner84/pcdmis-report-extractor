@@ -1,0 +1,44 @@
+name: Validate package
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate PowerShell syntax
+        shell: pwsh
+        run: |
+          $failed = $false
+          foreach ($file in Get-ChildItem -Filter *.ps1) {
+            $tokens = $null
+            $errors = $null
+            [void][System.Management.Automation.Language.Parser]::ParseFile(
+              $file.FullName,
+              [ref]$tokens,
+              [ref]$errors
+            )
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error "$($file.Name): $_" }
+              $failed = $true
+            }
+          }
+          if ($failed) { throw "PowerShell syntax validation failed." }
+
+      - name: Verify package checksums
+        shell: bash
+        run: sha256sum --check SHA256SUMS.txt
+
+      - name: Verify required variable list
+        shell: bash
+        run: |
+          expected=$'EXPORT_PATH\nFILE_PREFIX\nWORKS_ORDER\nSERIAL\nLOOPCOUNT'
+          actual="$(tr -d '\r' < Required-PCDMIS-Variables.txt)"
+          test "$actual" = "$expected"
