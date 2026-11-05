@@ -74,7 +74,7 @@ Define and populate these variables before the extractor runs:
 2. `FILE_PREFIX` — routine, part or drawing prefix. Example: `PART123_REV_A`.
 3. `WORKS_ORDER` — works order or P number. Example: `WO000123`.
 4. `SERIAL` — the **starting serial number** for the loop. It must be a whole number.
-5. `LOOPCOUNT` — the current one-based PC-DMIS loop iteration. The loop itself can create this variable.
+5. `LOOPCOUNT` — the current one-based report counter. Set it to `1` before the loop and increment it manually at the end of each loop iteration.
 
 The current serial number is calculated as:
 
@@ -88,7 +88,7 @@ Example with `SERIAL = 1001`:
 - `LOOPCOUNT = 2` produces serial `1002`.
 - `LOOPCOUNT = 5` produces serial `1005`.
 
-`LOOPCOUNT` must be a whole number of 1 or greater. Start the PC-DMIS loop at 1 unless you intentionally want a different serial offset.
+`LOOPCOUNT` must be a whole number of 1 or greater. The report script must run before `LOOPCOUNT` is incremented so the current component receives the correct serial number.
 
 ## Output filename
 
@@ -118,21 +118,26 @@ A CSV and export log with the same base filename are written beside it.
 
 ## Example: beginning of a looped PC-DMIS routine
 
-Create the four fixed values before the loop. Make the loop variable name exactly `LOOPCOUNT`.
+Ask the operator how many parts to run, convert the answer to an integer, initialise the five extractor variables and then start the PC-DMIS loop. `PARTS_TO_RUN` and `LOOPINDEX` control the routine; they are not additional variables required by the extractor.
 
 ```text
+C1=COMMENT/INPUT,NO,FULL SCREEN=NO,
+How many parts should this routine run? Enter a whole number of 1 or greater.
+ASSIGN/PARTS_TO_RUN=INT(C1.INPUT)
 ASSIGN/EXPORT_PATH="W:\Inspection_Reports"
 ASSIGN/FILE_PREFIX="PART123_REV_A"
 ASSIGN/WORKS_ORDER="WO000123"
 ASSIGN/SERIAL=1001
-LOOPCOUNT=LOOP/START,ID=NO,NUMBER=5,START=1,SKIP=,
+ASSIGN/LOOPCOUNT=1
+LOOPINDEX=LOOP/START,ID=NO,NUMBER=PARTS_TO_RUN,START=1,SKIP=,
 ```
 
 The exact spacing and optional fields displayed by PC-DMIS can vary. The important points are:
 
-- the fixed variables exist before the script call;
-- the loop output variable is named `LOOPCOUNT`;
-- the loop begins at 1;
+- the operator input is stored as `C1.INPUT` and converted to the numeric `PARTS_TO_RUN` value;
+- `PARTS_TO_RUN` is used as the loop's `NUMBER` value;
+- `LOOPCOUNT` is explicitly initialised to `1` before the loop;
+- the PC-DMIS loop can use a separate variable such as `LOOPINDEX` for its own iteration value;
 - `SERIAL` is the first component's numeric serial number.
 
 ## Example: end of each loop iteration
@@ -146,20 +151,24 @@ CS1=SCRIPT/FILENAME=C:\PCDMIS_Report_Fallback\Run-PCDMIS-Dimension-Extractor.bas
 FUNCTION/Main,SHOW=NO,,
 STARTSCRIPT/
 ENDSCRIPT/
+ASSIGN/LOOPCOUNT=LOOPCOUNT+1
 LOOP/END
 ```
 
-Insert the BASIC Script command using the PC-DMIS interface for your installed version, select the installed `.bas` file, choose the `Main` function and compile it. PC-DMIS may format the command block differently, but the script must execute before the loop advances to the next component.
+Insert the BASIC Script command using the PC-DMIS interface for your installed version, select the installed `.bas` file, choose the `Main` function and compile it. PC-DMIS may format the command block differently, but the script must execute before `LOOPCOUNT` is increased and before the loop advances to the next component.
 
 ## How to produce reports
 
 1. Install the package.
-2. Add the four fixed variables and a loop named `LOOPCOUNT` to the measurement routine.
-3. Put the BASIC Script call after the current component's dimensions and before `LOOP/END`.
-4. Compile the BASIC script when setting up the routine.
-5. Run the routine. The exporter reads all five variables without prompting the operator.
-6. Confirm that the `.xlsx`, `.csv` and `.export.log` files were created in `EXPORT_PATH`.
-7. Review the report before relying on it as controlled inspection evidence.
+2. Add an input comment asking how many parts to run and assign `PARTS_TO_RUN=INT(C1.INPUT)`.
+3. Set the five extractor variables, including `LOOPCOUNT=1`, before the loop.
+4. Use `PARTS_TO_RUN` as the PC-DMIS loop's `NUMBER` value.
+5. Put the BASIC Script call after the current component's dimensions.
+6. Immediately after the script call, add `ASSIGN/LOOPCOUNT=LOOPCOUNT+1`, followed by `LOOP/END`.
+7. Compile the BASIC script when setting up the routine.
+8. Run the routine. PC-DMIS asks once for the number of parts, then the exporter reads its five variables without additional prompts.
+9. Confirm that the `.xlsx`, `.csv` and `.export.log` files were created in `EXPORT_PATH`.
+10. Review the report before relying on it as controlled inspection evidence.
 
 Reusing the same five values produces the same filename and replaces the previous report. Use a unique works-order/serial combination where inspection records must not be overwritten.
 
